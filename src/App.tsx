@@ -1,126 +1,160 @@
 import "./styles.css";
-
-const project = {
-  "sourceNo": 10,
-  "id": "hxyfront-62008",
-  "port": 62008,
-  "title": "烟花燃放脚本编排",
-  "domain": "烟花燃放编排",
-  "prompt": "我想做一个面向烟花燃放编排师的燃放脚本前端工具，可以记录节目段落、烟花型号、口径、发射角度、点火时间、持续时间、安全距离和音乐时间点。页面需要有时间轴编排、燃放点位平面图、型号清单、冲突时间提示和整场节目预览。",
-  "palette": [
-    "#1d4ed8",
-    "#dc2626",
-    "#f59e0b"
-  ],
-  "metrics": [
-    "节目段落",
-    "点火节点",
-    "冲突提示",
-    "安全距离"
-  ],
-  "filters": [
-    "礼花弹",
-    "罗马烛光",
-    "扇形架",
-    "冷焰火"
-  ],
-  "fields": [
-    "节目段落",
-    "烟花型号",
-    "口径",
-    "发射角度",
-    "点火时间",
-    "安全距离"
-  ],
-  "records": [
-    [
-      "Intro",
-      "30mm扇形架",
-      "00:12.500",
-      "安全距离35m"
-    ],
-    [
-      "Chorus A",
-      "75mm礼花弹",
-      "01:08.200",
-      "与B点位间隔正常"
-    ],
-    [
-      "Finale",
-      "冷焰火",
-      "03:42.000",
-      "近景区待确认"
-    ]
-  ]
-};
+import { useShow } from "./state/useShow";
+import { VersionBar } from "./components/VersionBar";
+import { Timeline } from "./components/Timeline";
+import { PointMap } from "./components/PointMap";
+import { SegmentsPanel } from "./components/SegmentsPanel";
+import { NodeEditor } from "./components/NodeEditor";
+import { IssuesPanel } from "./components/IssuesPanel";
+import { Inventory } from "./components/Inventory";
+import { ISSUE_COLOR, OK_COLOR } from "./components/theme";
 
 function App() {
+  const {
+    catalog,
+    show,
+    version,
+    stock,
+    issues,
+    lastSwitch,
+    selectedNodeId,
+    setSelectedNodeId,
+    switchVersion,
+    toggleLock,
+    updateSegment,
+    updateNode,
+    updateStock,
+    restorePresets,
+  } = useShow();
+
+  const selectedNode =
+    show.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  const lockedCount = show.segments.filter((s) => s.locked).length;
+
   return (
     <main className="app">
-      <section className="hero">
-        <p>{project.id} · 源提示词{project.sourceNo} · Port {project.port}</p>
-        <h1>{project.title}</h1>
-        <span>{project.prompt}</span>
-      </section>
+      <header className="app-header">
+        <div>
+          <p className="kicker">hxyfront-62008 · 配乐改版台</p>
+          <h1>烟花燃放脚本 · 配乐改版台</h1>
+          <span className="subtitle">
+            联排后配乐 03:40 → 04:20。未锁定段落按首尾锚点比例重排，锁定段落留在原时刻；
+            冷却不足、危险区相交或节点越出段落即停止应用并保留上一版。
+          </span>
+        </div>
+        <button className="ghost-btn" onClick={restorePresets}>
+          恢复预置（3 段 / 4 点 / 8 枚）
+        </button>
+      </header>
 
       <section className="metrics">
-        {project.metrics.map((metric: string, index: number) => (
-          <article key={metric}>
-            <small>{metric}</small>
-            <strong>{[86, 14, 7, 32][index] ?? 12}</strong>
-          </article>
-        ))}
+        <article>
+          <small>节目段落</small>
+          <strong>{show.segments.length}</strong>
+          <em>锁定 {lockedCount} 段</em>
+        </article>
+        <article>
+          <small>燃放点位</small>
+          <strong>{catalog.points.length}</strong>
+          <em>平面坐标 1m 制</em>
+        </article>
+        <article>
+          <small>点火节点</small>
+          <strong>{show.nodes.length}</strong>
+          <em>枚烟花已编排</em>
+        </article>
+        <article>
+          <small>当前问题</small>
+          <strong style={{ color: issues.length ? ISSUE_COLOR : OK_COLOR }}>
+            {issues.length}
+          </strong>
+          <em>冷却 / 危险区 / 越界</em>
+        </article>
       </section>
 
-      <section className="workspace">
-        <aside className="panel">
-          <h2>{project.domain}筛选</h2>
-          <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
-          </div>
-        </aside>
+      <VersionBar
+        versions={catalog.versions}
+        show={show}
+        onSwitch={switchVersion}
+        lastSwitch={lastSwitch}
+      />
 
-        <section className="panel form-panel">
-          <div className="heading">
-            <div>
-              <p>专业字段</p>
-              <h2>新增记录</h2>
-            </div>
-            <button className="primary">保存草稿</button>
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>时间轴编排</h2>
+          <p>彩条为燃烧窗口，竖线为点火时刻；点击条目可在右侧编辑，红色描边为问题节点。</p>
+        </div>
+        <Timeline
+          show={show}
+          catalog={catalog}
+          duration={version.duration}
+          issues={issues}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={setSelectedNodeId}
+        />
+      </section>
+
+      <div className="console-grid">
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>燃放点位平面图</h2>
+            <p>四个点位，虚线圆表示与选中烟花危险区相交的点位。</p>
           </div>
-          <div className="field-grid">
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input placeholder={"填写" + field} />
-              </label>
-            ))}
-          </div>
+          <PointMap
+            show={show}
+            catalog={catalog}
+            issues={issues}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+          />
         </section>
+
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>段落锁定与锚点</h2>
+            <p>锁定段在改版时不重排；锚点支持 mm:ss.mmm 或秒数编辑。</p>
+          </div>
+          <SegmentsPanel
+            segments={show.segments}
+            onToggleLock={toggleLock}
+            onUpdate={updateSegment}
+          />
+          <div className="panel-subhead">
+            <h3>选中烟花</h3>
+          </div>
+          <NodeEditor
+            node={selectedNode}
+            catalog={catalog}
+            onUpdate={updateNode}
+          />
+        </section>
+      </div>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>冲突时间提示</h2>
+          <p>编辑期实时校验，切换版本时作为应用闸门。</p>
+        </div>
+        <IssuesPanel issues={issues} onSelectNode={setSelectedNodeId} />
       </section>
 
       <section className="panel">
-        <div className="heading">
-          <div>
-            <p>历史记录</p>
-            <h2>近期工作台</h2>
-          </div>
-          <button>导出摘要</button>
+        <div className="panel-heading">
+          <h2>型号清单与用量</h2>
+          <p>用量随当前版本节点实时统计，库存保存在本机，重开仍可编辑。</p>
         </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+        <Inventory
+          show={show}
+          catalog={catalog}
+          stock={stock}
+          onStockChange={updateStock}
+        />
       </section>
+
+      <footer className="app-footer">
+        数据（src/data）· 规则（src/rules）· 页面交互（src/components、src/state）分开维护，纯前端 +
+        localStorage，无后端。
+      </footer>
     </main>
   );
 }
